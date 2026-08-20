@@ -1,0 +1,97 @@
+---
+title: MDX 特性速览：不只是 Markdown
+date: 2026-08-18
+description: 代码高亮、表格、提示框、内联组件……MDX 到底能做什么。
+tags: [MDX, Markdown, Nextra]
+author: tisou1
+---
+
+Markdown 擅长写正文，而 [MDX](https://mdxjs.com) 更进一步：**你可以在 Markdown 里直接使用 React 组件**。本文用一篇文章演示 Nextra 支持的各种写法。
+
+## 代码块
+
+带文件名和行号：
+
+```ts filename="example.ts" showLineNumbers {1} /hello/
+const hello = 'world'
+console.log(hello) // 这一行会被高亮
+console.log(hello)
+```
+
+行高亮可以连续区间 `{2-4}`，也可以用 `/正则/` 高亮匹配到的行。点一下代码块右上角，还能一键复制。
+
+## 表格
+
+| 语法 | 用途 | 示例 |
+| --- | --- | --- |
+| **加粗** | 强调 | **重要** |
+| `行内代码` | 引用代码 | `npm run dev` |
+| [链接](#) | 跳转 | [Nextra](https://nextra.site) |
+
+## 提示框（Callout）
+
+Nextra 内置了 `Callout` 组件，可以做成提示、警告等样式：
+
+```mdx
+import { Callout } from 'nextra/components'
+
+<Callout type="info" emoji="💡">
+  这是提示框
+</Callout>
+```
+
+效果如下：
+
+import { Callout } from 'nextra/components'
+
+<Callout type="info" emoji="💡">
+  这是一个提示框，适合放补充说明。
+</Callout>
+
+<Callout type="warning" emoji="⚠️">
+  警告内容，适合提醒读者注意风险。
+</Callout>
+
+<Callout type="error" emoji="🚨">
+  错误示例，适合强调错误用法。
+</Callout>
+
+## 列表
+
+有序列表：
+
+1. 安装依赖
+2. 写文章
+3. 发布上线
+
+无序列表 + 任务列表：
+
+- [x] 配置 Nextra
+- [x] 写 MDX 文章
+- [ ] 配置评论系统
+
+## 引用
+
+> 好的文章不是写出来的，是改出来的。
+>
+> —— 佚名
+
+## 组件即文档
+
+MDX 最大的乐趣在于：当默认语法不够用时，直接写组件。
+
+```mdx
+<details>
+  <summary>点击展开</summary>
+  折叠内容也是 Markdown 兼容的。
+</details>
+```
+
+<details>
+  <summary>点击展开</summary>
+  折叠内容也是 Markdown 兼容的。
+</details>
+
+## 结语
+
+MDX 把"内容"和"组件"的边界打通了。写技术文章时，代码演示、交互示例都可以嵌在正文里，读者体验和写作体验都好很多。

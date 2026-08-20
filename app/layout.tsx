@@ -1,36 +1,27 @@
 import { Footer, Layout, Navbar, ThemeSwitch } from 'nextra-theme-blog'
 import { Banner, Head, Search } from 'nextra/components'
 import { getPageMap } from 'nextra/page-map'
+import type { ReactNode } from 'react'
 import 'nextra-theme-blog/style.css'
 
 export const metadata = {
-  title: 'Blog Example',
+  title: 'tisou1 的博客',
+  description: '技术踩坑、思考与总结',
 }
 
-export default async function RootLayout({ children }: LayoutProps<'/'>) {
+export default async function RootLayout({ children }: { children: ReactNode }) {
   const banner = (
-    <Banner storageKey="4.0-release">
-      🎉 Nextra 4.0 is released.{' '}
-      <a
-        href="#"
-        style={{
-          textDecoration: 'underline',
-          textUnderlinePosition: 'from-font',
-        }}
-      >
-        Read more →
-      </a>
+    <Banner storageKey="blog-banner">
+      欢迎来到 tisou1 的博客 🎉
     </Banner>
   )
 
-  console.log(await getPageMap(''))
-
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="zh-CN" suppressHydrationWarning>
       <Head backgroundColor={{ dark: '#0f172a', light: '#fefce8' }} />
       <body>
         <Layout banner={banner}>
-          <Navbar pageMap={await getPageMap('')}>
+          <Navbar pageMap={await getPageMap()}>
             <Search />
             <ThemeSwitch />
           </Navbar>
@@ -38,11 +29,14 @@ export default async function RootLayout({ children }: LayoutProps<'/'>) {
           {children}
 
           <Footer>
-            <abbr title="This site and all its content are licensed under a Creative Commons Attribution-NonCommercial 4.0 International License." style={{ cursor: 'help' }}>
+            <abbr
+              title="本网站及其所有内容采用知识共享署名-非商业性使用 4.0 国际许可协议授权。"
+              style={{ cursor: 'help' }}
+            >
               CC BY-NC 4.0
             </abbr>{' '}
-            {new Date().getFullYear()} © Dimitri POSTOLOV.
-            <a href="/feed.xml" style={{ float: 'right' }}>
+            {new Date().getFullYear()} © tisou1.
+            <a href="/rss.xml" style={{ float: 'right' }}>
               RSS
             </a>
           </Footer>

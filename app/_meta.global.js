@@ -2,8 +2,13 @@ export default {
   index: {
     type: 'page',
   },
-  docs: {
+  posts: {
     type: 'page',
-    items: {},
+    title: '文章',
+    items: {
+      draft: {
+        display: 'hidden',
+      },
+    },
   },
 }

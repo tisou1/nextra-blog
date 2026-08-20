@@ -1,0 +1,195 @@
+---
+title: _meta 文件配置完全指南
+date: 2026-08-20
+description: 导航栏、标题、排序、隐藏页面……一文说清 Nextra 的 _meta.js 配置。
+tags: [Nextra, 博客]
+author: tisou1
+---
+
+`_meta` 文件是 Nextra 用来**配置站点结构和导航**的文件，它决定了页面标题、排序、哪些页面出现在导航栏、哪些被隐藏等行为。
+
+## 文件长什么样
+
+`_meta` 文件支持 `.js` / `.jsx` / `.tsx` 后缀，导出的是一个普通的对象：
+
+```js filename="app/_meta.js"
+export default {
+  index: '首页',        // key 是路由名，value 是显示标题
+  posts: '文章',
+}
+```
+
+**key 是文件（或文件夹）的名字**，对应实际的路由；**value 是显示在导航里的标题**。最简单的写法就是 `key: '标题'`。
+
+没在 `_meta` 里列出的页面会追加到末尾并按字母排序（`index` 例外，它永远排最前）。
+
+## `_meta` 和 `_meta.global` 的区别
+
+Nextra 4 新增了 `.global` 后缀的变体：**只用单个文件配置整个站点**。
+
+- `_meta.js`：每个文件夹一个，放在对应目录下
+- `_meta.global.js`：全局单文件，但**文件夹条目必须带 `items` 字段**
+
+```js filename="app/_meta.global.js"
+export default {
+  index: {
+    type: 'page',
+  },
+  posts: {
+    type: 'page',
+    items: {
+      draft: {
+        display: 'hidden',
+      },
+    },
+  },
+}
+```
+
+> 注意：`_meta.global` 和 `_meta` 不能同时使用，只能选一种。
+
+本博客用的就是 `_meta.global.js`，上面的代码隐藏了草稿文章 `draft`。
+
+## 页面条目：完整字段
+
+当字符串写法不够用时，可以展开成对象：
+
+```ts
+type PageItemSchema = {
+  type: 'page' | 'doc'      // 默认 'doc'
+  display: 'normal' | 'hidden' | 'children'  // 默认 'normal'
+  title?: string | ReactElement
+  theme?: PageThemeSchema
+}
+```
+
+### `type: 'page'` — 显示在导航栏
+
+`type: 'page'` 的条目会出现在**导航栏**而不是侧边栏，非常适合博客、关于、外部链接这类独立页面：
+
+```js filename="app/_meta.global.js"
+export default {
+  index: {
+    type: 'page',
+    title: '首页',
+  },
+  posts: {
+    type: 'page',
+    title: '文章',
+  },
+}
+```
+
+如果所有条目都要 `type: 'page'`，可以用 `'*'` 键做兜底配置，省去重复：
+
+```js
+export default {
+  '*': { type: 'page' },
+  index: '首页',
+  posts: '文章',
+}
+```
+
+### `display: 'hidden'` — 隐藏页面
+
+`display: 'hidden'` 可以把页面从导航里藏起来，**但页面本身仍然可以通过 URL 访问**。本博客的草稿就是这么处理的：
+
+```js
+export default {
+  posts: {
+    type: 'page',
+    items: {
+      draft: { display: 'hidden' },
+    },
+  },
+}
+```
+
+文章写完、准备发布时，把这一行删掉即可。
+
+### `theme` — 页面级主题设置
+
+`theme` 可以按页面开关主题的各个组件（docs 主题下最常用）：
+
+| 字段 | 类型 | 默认值 | 作用 |
+| --- | --- | --- | --- |
+| `breadcrumb` | `boolean` | `true` | 面包屑导航 |
+| `collapsed` | `boolean` | `false` | 侧边栏默认折叠 |
+| `copyPage` | `boolean` | `true` | 复制本页按钮 |
+| `footer` | `boolean` | `true` | 页脚 |
+| `layout` | `'default' \| 'full'` | `'default'` | 布局模式 |
+| `navbar` | `boolean` | `true` | 导航栏 |
+| `pagination` | `boolean` | `true` | 分页控件 |
+| `sidebar` | `boolean` | `true` | 侧边栏 |
+| `timestamp` | `boolean` | `true` | 「最后更新」时间 |
+| `toc` | `boolean` | `true` | 目录 |
+| `typesetting` | `'default' \| 'article'` | `'default'` | 排版风格 |
+
+```js
+export default {
+  about: {
+    theme: {
+      sidebar: false,   // 这个页面不显示侧边栏
+      toc: false,       // 不显示目录
+    },
+  },
+}
+```
+
+> 设置在文件夹上时，会被所有子页面继承。
+
+## 链接、分隔符和菜单
+
+除了页面，`_meta` 还能放三类特殊条目。
+
+**外部链接**（内部相对链接也可以）：
+
+```js
+export default {
+  github: {
+    title: 'GitHub',
+    href: 'https://github.com/tisou1',
+  },
+}
+```
+
+**分隔符**（侧边栏里的分割线）：
+
+```js
+export default {
+  '###': {
+    type: 'separator',
+    title: '更多内容',  // 可选
+  },
+}
+```
+
+**下拉菜单**（导航栏）：
+
+```js
+export default {
+  company: {
+    type: 'menu',
+    title: '关于我们',
+    items: {
+      about: { title: '团队', href: '/about' },
+      contact: { title: '联系', href: 'mailto:hi@example.com' },
+    },
+  },
+}
+```
+
+## 两个容易踩的坑
+
+1. **key 不要用数字**。JavaScript 对象里数字键永远排在前面，`1992_10_21` 会被自动转成 `'19921021'` 并排到最前。想要按日期排序，应该用字符串加前缀，比如 `'10-21-post'`。
+2. **`_meta.global` 里的文件夹必须有 `items`**，这是它和普通 `_meta` 唯一的语法差异，漏了会报错。
+
+## 小结
+
+- 字符串简写：`key: '标题'`
+- 对象展开：`type` / `display` / `title` / `theme`
+- `type: 'page'` 进导航栏，`display: 'hidden'` 藏起来但保留 URL
+- 文件夹（`.global` 场景）用 `items` 配置子条目
+- `'*'` 键给同目录所有条目做兜底
+
+配置起来之后，新增一篇文章只需要建 `app/posts/<slug>/page.mdx`，导航、列表、RSS 都会自动跟上。

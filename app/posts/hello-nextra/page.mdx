@@ -1,0 +1,98 @@
+---
+title: 用 Nextra 搭建个人博客全记录
+date: 2026-08-20
+description: 从初始化到跑通的完整过程，包括我踩过的几个坑。
+tags: [Nextra, Next.js, 博客]
+author: tisou1
+---
+
+这是我的第一篇博客，记录一下整个站点的搭建过程，尤其是那些"官网文档没看懂、配置没跑通"的部分。
+
+## 为什么选 Nextra
+
+选择技术栈的时候，我想要的很简单：**用 Markdown 写文章**，同时能方便地展示代码、表格这类技术内容。
+
+[Nextra](https://nextra.site) 是 Next.js 生态里非常成熟的文档/博客框架，自带：
+
+- MDX 支持（可以在 Markdown 里写 React 组件）
+- 代码高亮、深色模式、RSS、全文搜索
+- 开箱即用的博客主题 `nextra-theme-blog`
+
+## 初始化与目录结构
+
+安装依赖后，核心的目录结构长这样：
+
+- `app/` — 页面目录，所有 `.mdx` 文件都会被自动编译成页面
+- `app/posts/<文章名>/page.mdx` — 每篇文章一个文件夹
+- `app/layout.tsx` — 根布局，主题组件都在这里配置
+- `next.config.ts` — Nextra 的入口配置
+
+## 踩过的坑
+
+### 1. `Can't resolve 'next-mdx-import-source-file'`
+
+这是最折磨人的一个报错。原因是在 Next.js 16 里，`next dev` 默认使用 Turbopack，而 Turbopack 需要一个显式的别名指向 `mdx-components` 文件。
+
+解决方案是两步：
+
+1. 在项目根目录创建 `mdx-components.tsx`，把主题的组件合并进来
+2. 在 `next.config.ts` 里加 `turbopack.resolveAlias` 配置
+
+```tsx filename="mdx-components.tsx"
+import { useMDXComponents as getThemeComponents } from 'nextra-theme-blog'
+
+const themeComponents = getThemeComponents()
+
+export function useMDXComponents(components) {
+  return {
+    ...themeComponents,
+    ...components,
+  }
+}
+```
+
+```ts filename="next.config.ts"
+export default withNextra({
+  turbopack: {
+    resolveAlias: {
+      'next-mdx-import-source-file': './mdx-components.tsx',
+    },
+  },
+})
+```
+
+### 2. 文章列表不显示
+
+博客主题的文章列表页（`/posts`）不是自动生成的，需要自己写一个页面，从 page map 里取文章数据：
+
+```tsx filename="app/posts/page.tsx"
+import { PostCard } from 'nextra-theme-blog'
+import { getPosts } from './get-posts'
+
+export default async function PostsPage() {
+  const posts = await getPosts()
+  return posts.map(post => <PostCard key={post.route} post={post} />)
+}
+```
+
+其中 `getPosts` 用 `normalizePages` + `getPageMap` 拿到所有文章的 frontmatter，再按日期排序。
+
+### 3. 文章里的组件报 `useState` 错误
+
+在 MDX 里直接写组件并 `import { useState } from 'react'` 会报错——MDX 默认是 Server Component，不能直接使用客户端 Hook。解决办法是把交互组件单独放到一个带 `'use client'` 的文件里，或者干脆只使用主题自带的能力。
+
+## 写文章的正确姿势
+
+每篇文章都是 `app/posts/<slug>/page.mdx`，头部写 frontmatter：
+
+```mdx
+---
+title: 文章标题
+date: 2026-08-20
+description: 摘要，会显示在文章卡片和 RSS 里
+tags: [Nextra, 博客]
+author: tisou1
+---
+```
+
+然后就可以愉快地写 Markdown 了。祝我（和你）写作愉快！

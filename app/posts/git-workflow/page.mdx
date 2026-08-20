@@ -1,0 +1,67 @@
+---
+title: Git 提交信息规范与日常工作流
+date: 2026-08-15
+description: 一份实用的 commit message 约定，以及单人/协作场景下的分支工作流。
+tags: [Git, 工程化]
+author: tisou1
+---
+
+> 本文是一篇技术随笔，分享我日常写 Git 提交信息的习惯。
+
+## 为什么要规范提交信息
+
+提交信息是给**未来的自己**和**协作者**看的。清晰的历史记录能让你：
+
+- `git log --oneline` 一眼扫出变更脉络
+- `git bisect` 定位问题时更快
+- 自动生成 changelog
+
+## Conventional Commits 约定
+
+最常用的格式是 **type(scope): subject**：
+
+```text
+feat(auth): 增加登录功能
+fix(parser): 修复空行解析报错
+docs: 更新 README
+refactor(utils): 拆分 formatDate 函数
+```
+
+常用 type：
+
+| type | 含义 | 例子 |
+| --- | --- | --- |
+| `feat` | 新功能 | 增加搜索框 |
+| `fix` | 修复 bug | 修复深色模式闪烁 |
+| `docs` | 文档 | 补充注释 |
+| `refactor` | 重构 | 提取公共函数 |
+| `perf` | 性能优化 | 缓存计算结果 |
+| `test` | 测试 | 补充单测 |
+| `chore` | 杂项 | 升级依赖 |
+
+## 日常工作流
+
+我个人的习惯，单人项目：
+
+```bash
+git checkout -b feat/xxx   # 新建分支
+git add -p                 # 分块暂存
+git commit -m "feat: ..."  # 小而完整的提交
+git push && git merge      # 合回主干
+```
+
+几个要点：
+
+1. **提交要小**：一个提交只做一件事
+2. **提交信息写"为什么"**：`fix: 延迟初始化连接，避免启动时白屏` 比 `fix: bug` 有用得多
+3. **改完立刻提交**：防止工作区堆积一堆未提交的改动
+
+## 一点补充
+
+如果团队有要求，可以用 commitlint 在提交时强制校验格式：
+
+```bash
+pnpm add -D @commitlint/cli @commitlint/config-conventional
+```
+
+不过工具只是手段，**让队友看得懂**才是目的。

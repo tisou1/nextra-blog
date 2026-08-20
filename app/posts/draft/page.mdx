@@ -1,0 +1,26 @@
+---
+title: 这是一篇草稿
+date: 2026-08-10
+description: 草稿示例：通过 _meta 配置隐藏，不会出现在文章列表中。
+tags: [草稿]
+author: tisou1
+---
+
+这篇文章还在写作中。
+
+它在 `app/_meta.global.js` 中被标记为隐藏，所以不会出现在 `/posts` 列表和 RSS 里，但通过链接仍然可以访问：
+
+```js filename="app/_meta.global.js"
+export default {
+  posts: {
+    type: 'page',
+    items: {
+      draft: {
+        display: 'hidden',
+      },
+    },
+  },
+}
+```
+
+写完内容后，把 `display: 'hidden'` 删掉即可发布。
