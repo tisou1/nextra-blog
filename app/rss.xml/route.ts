@@ -1,5 +1,7 @@
 import { getPosts } from '../posts/get-posts'
 
+export const dynamic = 'force-static'
+
 const CONFIG = {
   title: 'tisou1 的博客',
   siteUrl: 'https://your-domain.com',
@@ -16,7 +18,7 @@ export async function GET() {
         <description>${post.frontMatter.description}</description>
         <link>${CONFIG.siteUrl}${post.route}</link>
         <pubDate>${new Date(post.frontMatter.date).toUTCString()}</pubDate>
-    </item>`,
+    </item>`
     )
     .join('\n')
   const xml = `<?xml version="1.0" encoding="UTF-8" ?>
