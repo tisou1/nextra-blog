@@ -1,0 +1,175 @@
+---
+title: 把博客部署到 GitHub Pages：双仓库模式实战
+date: 2026-09-04
+description: 从方案选型到上线踩坑的完整记录：双仓库架构、跨仓库推送的 workflow、.nojekyll 这个关键标记，以及中文提交乱码的处理。
+tags: [Nextra, GitHub Pages, GitHub Actions, CI/CD]
+author: tisou1
+---
+
+这篇记录的是本站上线的全过程。博客本体跑通之后，"部署到哪、怎么自动发布"就成了下一个问题，这一趟下来踩的坑不少，最典型的是一个叫 `.nojekyll` 的空文件。
+
+## 方案选型：三种部署路径
+
+GitHub Pages 有两种站点类型，部署方案要围绕它们来选：
+
+| 类型 | 仓库要求 | 访问地址 |
+|------|---------|---------|
+| User site | 仓库必须叫 `<用户名>.github.io` | `https://tisou1.github.io` |
+| Project site | 任意仓库 | `https://tisou1.github.io/<仓库名>` |
+
+由此延伸出三种常见路径：
+
+1. **子路径部署**：`nextra-blog` 仓库直接开 Pages，访问 `.../nextra-blog/`。最简单，但要在 `next.config.ts` 配置 `basePath`，所有静态资源都会带一层前缀
+2. **重命名仓库**：把仓库改名为 `tisou1.github.io`，源码零改动，但仓库名被固定
+3. **双仓库模式**：保留 `nextra-blog` 存源码，另建一个 `tisou1.github.io` 空仓库存构建产物，用 GitHub Actions 桥接
+
+我选了第 3 种：**日常只更新 `nextra-blog`**，推送后 Actions 自动构建，把静态产物推到 `tisou1.github.io`，站点根域名访问。
+
+## 双仓库架构
+
+```
+nextra-blog (main)               tisou1.github.io (main)
+┌──────────────────┐   Actions  ┌────────────────────┐
+│  源码 + workflow  │ ─构建推送──▶│  构建产物 + .nojekyll │──▶ Pages 发布
+└──────────────────┘            └────────────────────┘
+```
+
+发布仓库只放构建产物，历史只有一条最新部署的提交（每次 force push 单条全新 commit），干净且可回溯。
+
+### 前置配置（网页端，一次性）
+
+1. 创建空仓库 `tisou1.github.io`，**不要**初始化 README
+2. 生成 Fine-grained PAT（GitHub → Settings → Developer settings），权限只需两项：仓库范围选 `tisou1.github.io`，权限只给 **Contents: Read and write**
+3. 把 token 存到 `nextra-blog` 仓库的 Actions Secret，名称 `DEPLOY_TOKEN`
+
+> 为什么需要 PAT？因为 workflow 里默认的 `GITHUB_TOKEN` 只有当前仓库的写权限，推不到另一个仓库。
+
+### 核心 workflow
+
+`.github/workflows/deploy.yml` 的部署步骤：
+
+```yaml
+- name: Push dist to tisou1.github.io
+  env:
+    DEPLOY_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
+  run: |
+    cd out
+    touch .nojekyll
+    git init -b main
+    git config user.name "github-actions[bot]"
+    git config user.email "github-actions[bot]@users.noreply.github.com"
+    git add -A
+    git commit -m "Deploy from nextra-blog@${{ github.sha }}"
+    git push -f "https://x-access-token:${DEPLOY_TOKEN}@github.com/tisou1/tisou1.github.io.git" main:main
+```
+
+两点设计：
+
+- `env` 传入 token 而不是直接内插到命令行，减少凭据暴露面
+- `touch .nojekyll` —— 下文的主角，没有它整个站点等于没样式
+
+构建链沿用项目自身的脚本：`pnpm build`（Next.js `output: 'export'` 静态导出），`postbuild` 自动跑 pagefind 生成搜索索引到 `out/_pagefind`，所以整个 `out/` 一起推上去，搜索就可用。
+
+## 最大的坑：`.nojekyll`
+
+**现象**：第一次部署后，`https://tisou1.github.io` 首页能打开，但 CSS、JS 全部 404，页面裸奔。
+
+**原因**：GitHub Pages 在「Deploy from a branch」模式下，收到文件后默认先用 **Jekyll**（Ruby 静态站生成器）处理一遍再发布。而 Jekyll 有个约定：**所有下划线开头的目录都被视为内部目录，构建时不发布**。
+
+Next.js 的产物恰恰全是下划线开头：
+
+```
+out/
+├── index.html    ✅ 正常发布
+├── rss.xml       ✅ 正常发布
+├── _next/        ❌ CSS、JS 全在这里，被 Jekyll 丢弃
+└── _pagefind/    ❌ 搜索索引，被丢弃
+```
+
+HTML 不带下划线所以能打开，但页面引用的 `/_next/static/...` 在服务器上根本不存在，404。
+
+**解法**：在产物根目录放一个空的 `.nojekyll` 文件。它是 GitHub Pages 约定的开关标记——检测到它就跳过 Jekyll，你推什么就发什么。官方文档在《Configuring a publishing source for your GitHub Pages site》的 troubleshooting 章节提到：外部 CI 部署时"typically include a `.nojekyll` file"，Pages 会因此识别出该分支"不需要构建步骤"。
+
+**验证**：修复后用脚本检查所有资源状态码，CSS/JS 从全 404 变成全 200。
+
+这一步对所有非 Jekyll 项目（Next.js、Vue、Sphinx 等）都是**必做**的——只要产物里有 `_` 开头的文件或目录。
+
+## 第二个坑：PowerShell 中文提交乱码
+
+在 Windows PowerShell 里直接 `git commit -m "中文信息"`，提交信息会变成类似 `鏀圭敤璺ㄤ粨搴撴帹閫侀儴缃插埌` 的乱码——shell 向 git 传参时发生了 GBK/UTF-8 编码混淆。
+
+**解法**：中文提交信息不走命令行，写进 UTF-8 编码的文件再用 `-F` 提交：
+
+```powershell
+git commit -F commit-msg.txt
+```
+
+如果乱码 commit 已经推上去了，只能重写历史修复：`git reset --soft <目标提交>` 后重新提交，再 `git push --force-with-lease` 覆盖。`--force-with-lease` 比裸 `--force` 安全——如果远端有别人的新提交会拒绝推送。
+
+## 验证清单
+
+部署完成后我逐项核验过，供以后排查时参考：
+
+- 首页 `https://tisou1.github.io/` → 200
+- CSS / JS（`/_next/static/...`）→ 200（`.nojekyll` 生效的标志）
+- RSS `https://tisou1.github.io/rss.xml` → 200
+- 搜索索引 `/_pagefind/pagefind.js` → 200
+- 文章页（如 `/posts/hello-nextra`）→ 正常渲染
+
+一个细节：Next.js 静态导出生成的是 `hello-nextra.html` 而不是 `hello-nextra/index.html`（因为默认 `trailingSlash: false`），所以直接访问 `/posts/hello-nextra/`（带尾斜杠）会 404，但站内链接都是无斜杠形式，GitHub Pages 会自动 301 到 `.html`，不影响正常浏览。
+
+## 日常更新流程
+
+配置完成后，写博客的流程就是：
+
+1. 在 `app/posts/<文章名>/page.mdx` 写新文章
+2. 提交并推送到 `nextra-blog`
+3. Actions 自动构建推送，约 1~2 分钟后站点更新
+
+完全不用碰发布仓库。唯一要记得的是 PAT 有有效期，到期后重新生成并更新 `DEPLOY_TOKEN` secret 即可。
+
+## 待优化：部署推送方式可切换为 gh-pages 工具
+
+目前 workflow 里的推送步骤是手写的 git 命令（init → commit → force push）。它能工作，但生态里有两个更成熟的工具可以替换，先记录在这里，以后需要时再切换：
+
+### 备选一：`gh-pages` npm 包
+
+专门做「把目录推送到 Pages 分支」的 Node 工具，封装了 git 细节：
+
+```yaml
+- name: Push dist
+  env:
+    DEPLOY_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
+  run: |
+    npx gh-pages \
+      --dotfiles \
+      --dist out \
+      --branch main \
+      --repo "https://x-access-token:${DEPLOY_TOKEN}@github.com/tisou1/tisou1.github.io.git"
+```
+
+注意：它默认排除点开头文件，**`--dotfiles` 必须加**，否则 `.nojekyll` 推不上去，CSS/JS 又会 404。
+
+### 备选二：`peaceiris/actions-gh-pages`
+
+社区最流行的部署 Action，封装最全，**自动生成 `.nojekyll`**、自动保留 CNAME：
+
+```yaml
+- name: Push dist
+  uses: peaceiris/actions-gh-pages@v4
+  with:
+    personal_token: ${{ secrets.DEPLOY_TOKEN }}
+    external_repository: tisou1/tisou1.github.io
+    publish_branch: main
+    publish_dir: ./out
+```
+
+### 对比与切换时机
+
+| | 手写 git（现状） | `gh-pages` 包 | `peaceiris` Action |
+|---|---|---|---|
+| `.nojekyll` | 手动 `touch` | 需 `--dotfiles` + 手动生成 | 自动生成 |
+| 依赖 | 零依赖 | npx 安装 | 第三方 Action |
+| CNAME 保留 | 无 | 不自动处理 | 自动保留 |
+
+当前手写版本零依赖、逻辑透明，暂时够用。**等需要绑定自定义域名（要保留 CNAME）时，再切换到 `peaceiris/actions-gh-pages`**，切换时删掉 workflow 里的 `touch .nojekyll` 即可。
